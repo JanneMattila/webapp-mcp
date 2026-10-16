@@ -58,7 +58,6 @@ Set-StrictMode -Version Latest
 $GraphAppId = "00000003-0000-0000-c000-000000000000"
 $GraphUserReadScopeId = "e1fd296f-fa3a-4a69-a32f-1b3f0f5d3f0b"
 $TeamsConsentRedirectUri = "https://teams.microsoft.com/api/platform/v1.0/oAuthConsentRedirect"
-$ProjectPath = Join-Path $PSScriptRoot ".." "src" "webapp-mcp" "webapp-mcp.csproj"
 
 $PreAuthorizedClients = [ordered]@{
     "ab3be6b7-f5df-413d-ac2d-abf1e3fd9c0b" = "Microsoft Enterprise token store"
@@ -128,11 +127,6 @@ function Invoke-Graph {
 
 function Get-ODataFilterUri([string] $BaseUri, [string] $Filter) {
     return "$($BaseUri)?`$filter=$([uri]::EscapeDataString($Filter))"
-}
-
-function Set-UserSecret([string] $Key, [string] $Value) {
-    & dotnet user-secrets set $Key $Value --project $ProjectPath | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "dotnet user-secrets set $Key failed." }
 }
 
 # ---------------------------------------------------------------------------
@@ -267,20 +261,8 @@ if (-not $SkipAdminConsent) {
 # --- Local development settings (dotnet user-secrets) --------------------------------
 Write-Host "Writing dotnet user-secrets for local development..." -ForegroundColor Cyan
 $additionalAudiences = @($identifierUris | Where-Object { $_ -ne "api://$clientId" })
-Set-UserSecret "AzureAd:TenantId" $tenantId
-Set-UserSecret "AzureAd:ClientId" $clientId
-for ($i = 0; $i -lt $additionalAudiences.Count; $i++) {
-    Set-UserSecret "AzureAd:Audiences:$i" $additionalAudiences[$i]
-}
-
-if ($CreateLocalDevSecret) {
-    Write-Host "Creating a 90-day client secret for local On-Behalf-Of testing..." -ForegroundColor Cyan
-    $endDate = (Get-Date).ToUniversalTime().AddDays(90).ToString("yyyy-MM-dd")
-    $secret = Invoke-Az ad app credential reset --id $clientId --append --display-name "$AppName-local-dev" --end-date $endDate --query password -o tsv
-    Set-UserSecret "AzureAd:ClientCredentials:0:SourceType" "ClientSecret"
-    Set-UserSecret "AzureAd:ClientCredentials:0:ClientSecret" ($secret | Out-String).Trim()
-    Write-Host "  Client secret stored in user-secrets (never committed to source control)."
-}
+& (Join-Path $PSScriptRoot "set-user-secrets.ps1") -TenantId $tenantId -ClientId $clientId -Audiences $additionalAudiences `
+    -CreateClientSecret:$CreateLocalDevSecret
 
 # --- Output -----------------------------------------------------------------------------
 $settings = [ordered]@{

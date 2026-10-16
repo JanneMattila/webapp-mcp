@@ -17,8 +17,8 @@ var scope = builder.Configuration["Mcp:Scope"] ?? "access_as_user";
 if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(clientId))
 {
     throw new InvalidOperationException(
-        "AzureAd:TenantId and AzureAd:ClientId must be configured. " +
-        "Run deploy/setup-entra.ps1 (sets user-secrets for local development) or set app settings.");
+        "AzureAd:TenantId and AzureAd:ClientId must be configured. For local development run " +
+        "deploy/set-user-secrets.ps1 (or deploy/setup-entra.ps1) to store them in dotnet user-secrets; in Azure use app settings.");
 }
 
 // Delegated (user) authentication: validate Entra ID access tokens and enable

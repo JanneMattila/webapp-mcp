@@ -25,6 +25,7 @@ from Microsoft Graph `/me` using the On-Behalf-Of flow.
 | [src/webapp-mcp](src/webapp-mcp) | MCP server (`/mcp`) |
 | [deploy/setup-entra.ps1](deploy/setup-entra.ps1) | Creates/updates the Entra app registration (scope, pre-authorized clients, redirect URI, Graph consent) |
 | [deploy/deploy-appservice.ps1](deploy/deploy-appservice.ps1) | Creates the App Service + managed identity in the current `az` subscription and deploys the app |
+| [deploy/set-user-secrets.ps1](deploy/set-user-secrets.ps1) | Stores local development settings (tenant, client ID, audiences, client secret) in .NET user secrets |
 | [deploy/get-token.ps1](deploy/get-token.ps1) | Gets a delegated token via Azure CLI for local testing |
 | [.mcp.json](.mcp.json) | GitHub Copilot CLI configuration (local server) |
 | [.vscode/mcp.json](.vscode/mcp.json) | VS Code configuration (local and Azure) |
@@ -41,9 +42,10 @@ az login
 # 5. Microsoft 365 admin center: Copilot > Connectors > Create a new connector > Connect to MCP server
 ```
 
-Local test with GitHub Copilot CLI:
+Local test with GitHub Copilot CLI (settings come from .NET user secrets, not from `appsettings.json`):
 
 ```powershell
+./deploy/set-user-secrets.ps1 -Show     # verify local settings (setup-entra.ps1 already stored them)
 dotnet run --project src/webapp-mcp     # terminal 1
 . ./deploy/get-token.ps1; copilot       # terminal 2
 ```

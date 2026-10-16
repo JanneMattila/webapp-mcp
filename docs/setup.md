@@ -96,7 +96,8 @@ and [SSO for API-based message extensions](https://learn.microsoft.com/microsoft
 | API permissions | Microsoft Graph delegated `User.Read` + tenant-wide admin consent |
 | Service principal | Created (enterprise application) |
 
-It also writes `deploy/entra-app.settings.json` (git-ignored) and dotnet user-secrets for local runs.
+It also writes `deploy/entra-app.settings.json` (git-ignored) and stores the local development settings in
+.NET user secrets (see [Configure local settings with user secrets](#configure-local-settings-with-user-secrets)).
 
 Parameters:
 
@@ -210,7 +211,54 @@ Server logs: `az webapp log tail -g rg-webapp-mcp -n <app name>` (enable App Ser
 
 ## Local testing with GitHub Copilot
 
-Run the server locally (reads TenantId/ClientId/secret from user-secrets set by `setup-entra.ps1`):
+### Configure local settings with user secrets
+
+The source-controlled [`appsettings.json`](../src/webapp-mcp/appsettings.json) only contains empty placeholders.
+Your tenant ID, client ID, extra audiences and the local client secret are stored in
+[.NET user secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets), outside the repository:
+
+- Windows: `%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json`
+- Linux/macOS: `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json`
+
+`<UserSecretsId>` is defined in [`webapp-mcp.csproj`](../src/webapp-mcp/webapp-mcp.csproj). ASP.NET Core loads
+user secrets automatically when `ASPNETCORE_ENVIRONMENT=Development`, which both launch profiles set.
+
+`setup-entra.ps1` populates them for you. To set or update them separately, use
+[`set-user-secrets.ps1`](../deploy/set-user-secrets.ps1):
+
+```powershell
+# Values from deploy/entra-app.settings.json (written by setup-entra.ps1)
+./deploy/set-user-secrets.ps1
+
+# Also create a new 90-day client secret on the app registration (needed for get_my_profile locally)
+./deploy/set-user-secrets.ps1 -CreateClientSecret
+
+# Existing app registration: pass the IDs and type the client secret at a hidden prompt
+./deploy/set-user-secrets.ps1 -TenantId <tenant-id> -ClientId <client-id> -PromptClientSecret
+
+# Add the Teams Developer Portal Application ID URI as an accepted audience (replaces stored audiences)
+./deploy/set-user-secrets.ps1 -Audiences "api://auth-..."
+
+# Show the current values (client secret masked)
+./deploy/set-user-secrets.ps1 -Show
+```
+
+The script pipes the values to `dotnet user-secrets set` through standard input, so the client secret doesn't
+appear on a command line, and it keeps any other user secrets you've added. The equivalent manual commands are:
+
+```powershell
+dotnet user-secrets set "AzureAd:TenantId" "<tenant-id>" --project src/webapp-mcp
+dotnet user-secrets set "AzureAd:ClientId" "<client-id>" --project src/webapp-mcp
+dotnet user-secrets set "AzureAd:Audiences:0" "api://auth-..." --project src/webapp-mcp
+dotnet user-secrets set "AzureAd:ClientCredentials:0:SourceType" "ClientSecret" --project src/webapp-mcp
+dotnet user-secrets set "AzureAd:ClientCredentials:0:ClientSecret" "<secret>" --project src/webapp-mcp
+dotnet user-secrets list --project src/webapp-mcp
+```
+
+> User secrets are for local development only. In Azure, the same settings are App Service app settings
+> (`AzureAd__TenantId`, ...) and the client credential is the managed identity, so no secret is stored anywhere.
+
+### Run the server
 
 ```powershell
 dotnet run --project src/webapp-mcp
@@ -268,7 +316,8 @@ Invoke-RestMethod http://localhost:5080/mcp -Method Post -Headers $headers -Cont
 | `401` with `invalid_token` / audience error in logs | The token audience isn't accepted. Make sure step 4 was done (identifier URI + `AzureAd__Audiences__N`). |
 | `403` from `/mcp` | Token doesn't contain the `access_as_user` scope. Check the Developer Portal **Scope** value. |
 | `AADSTS65001` (consent) when running `get-token.ps1` | Azure CLI isn't pre-authorized. Re-run `setup-entra.ps1` without `-SkipDeveloperClients`. |
-| `get_my_profile` fails locally with a credential error | No client credential configured. Re-run `setup-entra.ps1 -CreateLocalDevSecret`. |
+| `get_my_profile` fails locally with a credential error | No client credential configured. Run `./deploy/set-user-secrets.ps1 -CreateClientSecret` (check with `-Show`). |
+| App fails to start: `AzureAd:TenantId and AzureAd:ClientId must be configured` | User secrets aren't set, or `ASPNETCORE_ENVIRONMENT` isn't `Development`. Run `./deploy/set-user-secrets.ps1`. |
 | `get_my_profile`: consent or additional sign-in required | Graph `User.Read` admin consent is missing. Grant it in Entra admin center > App registrations > `webapp-mcp` > **API permissions** > **Grant admin consent**. |
 | `AADSTS70021` / `AADSTS700213` in App Service logs | Federated identity credential doesn't match the managed identity. Re-run `deploy-appservice.ps1`. |
 | Connector doesn't show up / old behavior | Connector changes can take up to 15 minutes. Check the staged rollout includes your user. |
