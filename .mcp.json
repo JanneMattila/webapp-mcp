@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "webapp-mcp": {
+      "type": "http",
+      "url": "http://localhost:5080/mcp",
+      "headers": {
+        "Authorization": "Bearer ${WEBAPP_MCP_TOKEN}"
+      },
+      "tools": ["*"]
+    }
+  }
+}

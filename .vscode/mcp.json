@@ -1,0 +1,21 @@
+{
+  // VS Code discovers Entra ID from the server's protected resource metadata and signs you in
+  // with its built-in Microsoft account provider (VS Code is pre-authorized by setup-entra.ps1).
+  "inputs": [
+    {
+      "id": "appServiceHost",
+      "type": "promptString",
+      "description": "App Service host name, e.g. webapp-mcp-1234abcd.azurewebsites.net"
+    }
+  ],
+  "servers": {
+    "webapp-mcp-local": {
+      "type": "http",
+      "url": "http://localhost:5080/mcp"
+    },
+    "webapp-mcp-azure": {
+      "type": "http",
+      "url": "https://${input:appServiceHost}/mcp"
+    }
+  }
+}
